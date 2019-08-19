@@ -1,6 +1,11 @@
 Market Segmentation
 ================
 
+Akankshi Modi and Javeria Rangoonwala
+8/11/2019
+
+
+
 ``` r
 rm(list=ls())
 library(ggplot2)
@@ -737,11 +742,12 @@ Photo-sharing and shopping are most related to chatter. As expected with
 spam, the adult category is the most correlated. With uncategorized,
 dating, cooking, tv-film and beauty are most correlated.
 
-In the general correlation heatmap, we can see that categories like
-sports are highly correlated to heath and fitness. Since our company is
-a large consumer brand company, correlation between categories such as
-photo-sharing and shopping can be extremely useful to them. For example,
-closely related tweets in categories such as photo sharing and shopping
-leads me to believe that such customers would ideally follow bloggers
-who post pictures of everything on social media. The company can use
-bloggers as one of their marketing techniques.
+In the general correlation heatmap, the highest correlated categories 
+which have a correlation approximately equal to 1 are 
+(health_nutrition, personal_fitness) and (college_uni, online gaming).
+Since our company is a large consumer brand company, correlation between 
+categories such as photo-sharing and shopping can be extremely useful
+to them. For example, closely related tweets in categories such as 
+photo sharing and shopping leads me to believe that such customers would 
+ideally follow bloggers who post pictures of everything on social media.
+The company can use bloggers as one of their marketing techniques.
