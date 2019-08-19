@@ -1,0 +1,1074 @@
+---
+title: "All Exercises"
+output: html_document
+---
+
+#Visual story telling part 1: Green Buildings
+```{r}
+#load in necessary packages
+library(tidyverse)
+library(knitr)
+library(ggplot2)
+library(dplyr)
+```
+
+
+```{r}
+#read in data
+GB <- read.csv("greenbuildings.csv")
+#head(GB)
+names(GB)
+```
+```{r}
+GB_higherocc <- subset(GB,  leasing_rate> .1)
+#GB_higherocc
+```
+To be consistent with the "Excel gurus analysis, I created a subset of the data that only includes properties with leasing rate greater than 10%. 
+
+##multivariate linear regression
+Perform a simple linear regression to get a better feel of the relationships we'd want to explore visually
+
+```{r}
+#linear regression including all variables
+lm.gb=lm(Rent~., data=GB_higherocc)
+summary(lm.gb)
+```
+Interestingly, we see here that whether a building is either LEED- or EnergyStar-certified is not a statistically significant predictor of rent. The relationships that may be interesting to investigate would be building class and whether the rent is quoted on a net contract basis.
+
+
+##first pass: compare rent for green vs. non-green buildings, holding nothing constant
+```{r}
+ggplot(GB_higherocc, aes(x=green_rating, y=Rent, fill= as.factor(green_rating))) + stat_summary(fun.y="mean", geom="bar")
+```
+We see that on average that green buildings appear to have higher rents per square foot. But is this due to the green rating alone or are there other confounding factors? Let's examine some of the factors we found to be signigicant in the linear regression. 
+
+##second pass: compare rent for green vs. non-green buildings, holding class constant
+```{r}
+library(dplyr)
+
+d4 = GB_higherocc %>%
+  group_by(green_rating, class_a) %>%
+  dplyr :: summarize(mean_rent = mean(Rent))
+d4
+
+ggplot(data = d4) + 
+  geom_bar(mapping = aes(x=green_rating, y=mean_rent, fill= as.factor(green_rating)), stat='identity') + facet_wrap(~class_a)
+```
+Here, the two predictors of rent being investigated are building class and whether or not the building has a green rating. We are specifically looking at Class A buildings, which are the highest quality buildings in a given market. Buildings flagged as Class A are equal to 1 and Class B and Class C buildings are equal to 0. Interestingly, we see here on average that for Class A buildings, green buildings' rents per square foot are less than non-green buildings. For Class B and Class C buildings, green buildings' rents seem to be slightly higher. So given the building is high quality, green buildings seem to earn less in rent. 
+
+##third pass: compare rent for green vs. non-green buildings, holding net constant
+```{r}
+d5 = GB_higherocc %>%
+  group_by(green_rating, net) %>%
+  dplyr :: summarize(mean_rent = mean(Rent))
+d5
+
+ggplot(data = d5) + 
+  geom_bar(mapping = aes(x=green_rating, y=mean_rent, fill= as.factor(green_rating)), stat='identity') + facet_wrap(~net)
+```
+The next factor I wanted to examine based on the regression results was whether the rent is quoted on a "net contract" basis. Tenants with net-rental contracts pay their own utility costs, which are otherwise included in the quoted rental price. These properties are flagged in the dataset with 1. I would have expected that tenants that have to pay for their own utility costs would be willing to pay a premium to live in a green building to keep utility costs down, but we see here that's not the case. The average rent for places with rents quoted on a net contract is very similar for green and non-green buildings. Meanwhile, the green properties that include utilities in rent actually have higher rents than non-green buildings, whose utility costs should be higher. 
+
+##fourth pass: compare rent for green vs. non-green buildings, holding class and net constant
+```{r}
+GB_higherocc = na.omit(GB_higherocc)
+
+d6 = GB_higherocc %>%
+  group_by(green_rating, class_a, net) %>%
+  dplyr :: summarize(mean_rent = mean(Rent))
+d6
+
+ggplot(data = d6) + 
+  geom_bar(mapping = aes(x=class_a, y=mean_rent, fill=as.factor(green_rating)),
+           stat='identity', position ='dodge') + 
+  facet_wrap(~net) + 
+  labs(title="Mean Rent", 
+       y="Mean Rent",
+       x = "Class A",
+       fill="Green Rating")
+```
+When we include green rating, building class, and net on the same plot, we see that there are very few cases where green building outperform non-green buildings in terms of average rent per sqaure feet. The only case where green buildings' rents are clearly higher than non-green buildings' rents is where it is a Class B or C building with a net contract. The highest rents for green buildings is where it is a Class A building without a net contract, but here it does not outperform a non-green building.
+
+##summary
+In summary, I do not agree with the conclusions of the on-staff stats guru. I believe he failed to take into account confounding variables for the relationship between rent and green status, namely building class and whether or not the property quotes rent on a net contract basis. From my analysis, non-green buildings outperform green buildings in nearly every category which makes me question whether investing in a green building over a non-green building is truly worth it from an economic perspective. Especially when you factor in the additional cost of the green certification.   
+
+
+#Visual story telling part 2: flights at ABIA
+```{r}
+#load in necessary packages
+library(tidyverse)
+library(knitr)
+library(ggplot2)
+library(dplyr)
+library(plyr)
+
+#read in data
+airdata <- read.csv('ABIA.csv')
+head(airdata)
+attach(airdata)
+```
+
+```{r}
+#create df of just cancelled flights
+cancelled = subset(airdata, Cancelled == 1)
+head(cancelled)
+
+#create df of just flights coming to Austin
+incoming <- subset(airdata, Origin != "AUS")
+head(incoming)
+
+#create df of just cancelled flights coming to Austin
+inc_cancelled <- subset(cancelled, Origin != "AUS")
+head(inc_cancelled)
+```
+
+```{r}
+#group flights by origin and summarize by the percentage of flights from that origin that are cancelled
+#then only include the origins with the 10 highest percentage of cancelled flights
+
+d1 = incoming %>%
+  group_by(Origin) %>%
+  dplyr :: summarize(canc_pct = sum(Cancelled==1)/n())%>% 
+  arrange(desc(canc_pct))%>% 
+  slice(1:10)
+d1
+
+#plot origin vs. cancelled percentage in descending order
+ggplot(data = d1, aes(x=reorder(Origin,-canc_pct), y=canc_pct)) + 
+geom_bar(stat='identity')
+```
+Here, we've plotted the top 10 origins with the most cancellations, only including incoming flights to Austin. St. Louis Lambert International Airport has the highest portion of cancellations of all the origin locations.  
+
+```{r}
+# plot the percentage of total cancellations per day in descending order
+library(plyr)
+d2 = incoming %>%
+  group_by(DayOfWeek) %>%
+  dplyr :: summarize(canc_day_pct = sum(Cancelled==1)/n()) 
+d2
+
+#plot day of week vs. cancelled percentage in descending order
+ggplot(data = d2, aes(x=reorder(DayOfWeek,-canc_day_pct), y=canc_day_pct)) + 
+geom_bar(stat='identity')
+```
+When we plot cancellations by day, we see that the most cancellations are on Tuesdays. 
+
+```{r}
+#create catgorical varaible for time of day
+incoming$catDepTime = cut(incoming$CRSDepTime, breaks=c(1,1200,2400), labels=c("Morning","Afternoon"))
+
+incoming$catDepTime[1:10]
+```
+```{r}
+#plotting the days and times of day when most cancellations occur
+d3 = incoming %>%
+  group_by(DayOfWeek, catDepTime) %>%
+  dplyr :: summarize(time_canc_pct = sum(Cancelled==1)/n())
+d3
+
+ggplot(data = d3) + 
+  geom_bar(mapping = aes(x=catDepTime, y=time_canc_pct), stat='identity') + facet_wrap(~DayOfWeek)
+```
+When we plot cancellations by day and time of day, we see that most of the cancellations occur on Tuesday afternoons. 
+
+
+```{r}
+canc_carrier = airdata %>%
+  group_by(UniqueCarrier) %>%
+  dplyr :: summarize(canc = sum(Cancelled==1))
+canc_carrier
+#plot(norm_canc, las = 2)
+
+ggplot(data = canc_carrier, aes(x=reorder(UniqueCarrier,-canc), y=canc)) + 
+geom_bar(stat='identity')
+```
+From this plot, we see that the carrier with the highest number of cancellations is AA. However, this doesn't mean much in context. Let's normalize to see who performs the best and worst in terms of cancellation. 
+
+```{r}
+norm_canc = airdata %>%
+  group_by(UniqueCarrier) %>%
+  dplyr :: summarize(canc_norm = sum(Cancelled==1)/n())
+norm_canc
+
+ggplot(data = norm_canc, aes(x=reorder(UniqueCarrier,-canc_norm), y=canc_norm)) + 
+geom_bar(stat='identity')
+```
+Here, we see that MQ actually ended up performing the worst when normalized, and AA wasn't actually too bad. 
+
+
+#Portfolio Modeling
+```{r}
+library(mosaic)
+library(quantmod)
+library(foreach)
+
+# Import a few stocks
+port1 = c("IWR", "VNQ", "SPY", "USO", "INR", "GOVT", "HEDJ", "QAI", "VEA", "VPU")
+myprices = getSymbols(port1, from = "2014-01-02")
+
+# Adjust for splits and dividends
+IWRa = adjustOHLC(IWR)
+VNQa = adjustOHLC(VNQ)
+SPYa = adjustOHLC(SPY)
+USOa = adjustOHLC(USO)
+INRa = adjustOHLC(INR)
+GOVTa = adjustOHLC(GOVT)
+HEDJa = adjustOHLC(HEDJ)
+QAIa = adjustOHLC(QAI)
+VEAa = adjustOHLC(VEA)
+VPUa = adjustOHLC(VPU)
+```
+For my first portfolio, I decided to pick 10 random stocks from the database of ETFs, thus giving me a diverse portfolio with many elements. I made sure for every stock I picked that there were at least 5 years of data. 
+
+```{r}
+all_returns10 = cbind(ClCl(IWRa),
+								ClCl(VNQa),
+								ClCl(SPYa),
+								ClCl(USOa),
+								ClCl(INRa),
+								ClCl(GOVTa),
+								ClCl(HEDJa),
+								ClCl(QAIa),
+								ClCl(VEAa),
+								ClCl(VPUa))
+head(all_returns10)
+all_returns10 = as.matrix(na.omit(all_returns10))
+#get returns and eliminate any missing elements
+```
+
+```{r}
+initial_wealth = 100000
+sim10 = foreach(i=1:5000, .combine='rbind') %do% {
+	total_wealth = initial_wealth
+	weights = c(0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1)#equal redistribution everyday
+	holdings = weights * total_wealth
+	n_days = 20 #4 week trading period, so 20 days
+	wealthtracker = rep(0, n_days)
+	for(today in 1:n_days) {
+		return.today = resample(all_returns10, 1, orig.ids=FALSE)
+		holdings = holdings + holdings*return.today
+		total_wealth = sum(holdings)
+		#equal redistribution
+		wealthtracker[today] = total_wealth
+	}
+	wealthtracker
+}
+
+head(sim10)
+hist(sim10[,n_days], 50)
+```
+
+```{r}
+mean(sim10[,n_days])
+hist(sim10[,n_days]- initial_wealth, breaks=30)
+
+VAR10 = quantile(sim10[,n_days], .05)#calc VAR 5%
+VAR10
+```
+
+```{r}
+###3 stock
+
+mystocks3 = c("XLE", "VDE", "XOP")
+myprices = getSymbols(mystocks3, from = "2014-01-01")
+
+# Adjust for splits and dividends
+XLEa = adjustOHLC(XLE)
+VDEa = adjustOHLC(VDE)
+XOPa = adjustOHLC(XOP)
+```
+For my second portfolio, I chose to do Oil & Gas Energy EFTs, and only do three of them. I wanted to create a riskier portfolio, so having only three EFTs and basing all of them out of a pretty volatile industry seemed to acheive this goal.
+
+```{r}
+all_returns3 = cbind(ClCl(XLEa),
+								ClCl(VDEa),
+								ClCl(XOPa))
+head(all_returns3)
+all_returns3 = as.matrix(na.omit(all_returns3))
+#get returns and eliminate any missing elements
+```
+
+```{r}
+initial_wealth = 100000
+sim3 = foreach(i=1:5000, .combine='rbind') %do% {
+	total_wealth = initial_wealth
+	weights = c(0.33, 0.33, 0.34) #as equally distributed as it can be each day
+	holdings = weights * total_wealth
+	n_days = 20 #4 week trading period
+	wealthtracker = rep(0, n_days)
+	for(today in 1:n_days) {
+		return.today = resample(all_returns3, 1, orig.ids=FALSE)
+		holdings = holdings + holdings*return.today
+		total_wealth = sum(holdings)
+		holdings = weights * total_wealth #equal redistribution
+		wealthtracker[today] = total_wealth
+	}
+	wealthtracker
+}
+
+head(sim3)
+hist(sim3[,n_days], 20)
+
+```
+```{r}
+mean(sim3[,n_days])
+hist(sim3[,n_days]- initial_wealth, breaks=30)
+
+VAR3 = quantile(sim3[,n_days], .05)#calc 5% VAR
+VAR3
+```
+
+```{r}
+###5 stocks - all Alternative EFTs (hedge fund and long short)
+
+mystocks5 = c('MNA', 'RLY', 'HSPX','BTAL', 'CSM')
+myprices = getSymbols(mystocks5, from = "2014-01-01")
+
+# Adjust for splits and dividends
+MNAa = adjustOHLC(MNA)
+RLYa = adjustOHLC(RLY)
+HSPXa = adjustOHLC(HSPX)
+BTALa = adjustOHLC(BTAL)
+CSMa = adjustOHLC(CSM)
+```
+For my last portfolio, I chose to do five alternative ETFs (hedge fund and long-short). Since these are a different kind of ETF, I initially figured they could be a riskier investment.
+
+```{r}
+all_returns5 = cbind(ClCl(MNAa),
+								ClCl(RLYa),
+								ClCl(HSPXa),
+								ClCl(BTALa),
+								ClCl(CSMa))
+head(all_returns5)
+all_returns5 = as.matrix(na.omit(all_returns5))
+#get returns and eliminate any missing elements
+```
+
+```{r}
+initial_wealth = 100000
+sim5 = foreach(i=1:5000, .combine='rbind') %do% {
+	total_wealth = initial_wealth
+	weights = c(0.2, 0.2, 0.2, 0.2, 0.2)#equal redistribution everyday
+	holdings = weights * total_wealth
+	n_days = 20 #4 week trading period, so 20 days
+	wealthtracker = rep(0, n_days)
+	for(today in 1:n_days) {
+		return.today = resample(all_returns5, 1, orig.ids=FALSE)
+		holdings = holdings + holdings*return.today
+		total_wealth = sum(holdings)
+		holdings = weights * total_wealth#equal redistribution
+		wealthtracker[today] = total_wealth
+	}
+	wealthtracker
+}
+
+head(sim5)
+hist(sim5[,n_days], 30)
+```
+
+```{r}
+mean(sim5[,n_days])
+hist(sim5[,n_days]- initial_wealth, breaks=30)
+
+VAR5 = quantile(sim5[,n_days], .05)#calculate 5% VAR
+VAR5
+```
+
+```{r}
+VAR10
+VAR3
+VAR5
+```
+As a recap, VAR10 is the value-at-risk for our first portfolio, which contained 10 randomly-chosen ETFs, and is therefore a diverse portfolio. Its value-at-risk is $96,113.46.
+VAR3 is the value-at-risk for our second portfolio, which contained 3 energy ETFs, and is therefore a riskier portfolio. Its value-at-risk is $88,147.98.
+VAR5 is the value-at-risk for our third portfolio, which contained 5 alternative ETFs, and is theoretically a riskier portfolio. Its value-at-risk is $96,920.88.
+
+I was surprised by the outcome of this. I definietly expected our second portfolio with energy ETFs to have a lower number for value-at-risk, but I expected the alternative portfolio to also have a low number, and it ended up having a slightly better value-at-risk than our very diverse portfolio. This might be because of the specific ETFs I picked (they might have been better performers than others), but still I would have expected that the first portfolio would have the lowest risk factor. It was an interesting observation for sure. 
+
+#Market Segmentation
+```{rsetup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+rm(list=ls())
+library(ggplot2)
+library(LICORS)  # for kmeans++
+library(foreach)
+library(mosaic)
+library(dplyr)
+
+raw.data = read.csv('social_marketing.csv', header=TRUE)
+
+summary(raw.data)
+raw.data <- distinct(raw.data)
+raw.data[is.na(raw.data)] <- 0
+```
+
+```{r}
+head(raw.data)
+```
+
+```{r}
+# Center and scale the data
+X = raw.data[,-2]
+X = X[,-5]
+X = X[,-1]
+#X
+X = scale(X, center=TRUE, scale=TRUE)
+
+# Extract the centers and scales from the rescaled data (which are named attributes)
+mu = attr(X,"scaled:center")
+sigma = attr(X,"scaled:scale")
+```
+Elbow method to find a value of k. Since k = 10 seems like an elbow, we are going to take k = 10 to create clusters.
+
+```{r}
+k_grid = seq(2, 20, by=1)
+SSE_grid = foreach(k = k_grid, .combine='c') %do% {
+  cluster_k = kmeans(X, k, nstart=50)
+  cluster_k$tot.withinss
+}
+
+plot(k_grid, SSE_grid)
+```
+
+```{r}
+# Run k-means with 10 clusters and 25 starts
+clust1 = kmeans(X, 10, nstart=25)
+
+# What are the clusters?
+clust1$center  # not super helpful
+clust1$center[1,]*sigma + mu
+clust1$center[2,]*sigma + mu
+clust1$center[4,]*sigma + mu
+```
+
+To find which products are in which cluster, we run the following code
+```{r}
+library(ggplot2)
+theme_set(theme_bw())
+Y = data.frame(raw.data)
+Y$cluster = 0
+for (i in 1:10){
+  for (j in which(clust1$cluster == i)){
+    Y[j,"cluster"] = i
+  }
+  
+}
+
+```
+
+
+We constructed this ordered bar chart to see which categories are most closest to which clusters.  In some clusters, only 1 or 2 categories are common, such as, in Cluster 6 where college uni and online gaming are the only prevalent categories. However, in other clusters, there is a good mix of equally important categories, such as, that in Cluster 1, where categories like sports fanthom, religion, parenting and food are common. 
+```{r}
+par(mfrow=c(5,2))
+for (i in 1:10) {
+  
+  mask = Y$cluster==i
+  temp = Y[,-length(Y)]
+  value_count = rowSums(t(temp[mask,-1]))
+  df = as.data.frame(value_count)
+  df$index = rownames(df)
+  #print(df)
+
+
+# Draw plot
+  print(ggplot(df ,aes(x=index, y=value_count)) + 
+          geom_bar(stat="identity", width=.5, fill="tomato3") +
+          labs(title="Bar Chart",
+               subtitle="Categories vs Value Counts") + 
+          theme(axis.text.x = element_text(angle=65, vjust=0.6)))
+}
+
+```
+
+
+We also considered the CH index to look at possible estimates of K. Since a good value for K in CH index is when the CH grid value is high, we can conclude here that according to this method, k = 2 or k = 3 is a reasonale k-value.
+```{r}
+N = nrow(X)
+CH_grid = foreach(k = k_grid, .combine='c') %do% {
+  cluster_k = kmeans(X, k, nstart=50)
+  W = cluster_k$tot.withinss
+  B = cluster_k$betweenss
+  CH = (B/W)*((N-k)/(k-1))
+  CH
+}
+
+plot(k_grid, CH_grid)
+```
+
+
+
+
+Using kmeans++, a random centroid value is chosen, and subsequent cliusters are chosen on the basis of maximum distance between the clusters. Here we can see a similar pattern as that in the ordered bar chart above. Categories like online gaming and college uni are the only ones important in one cluster, but categories like sports fandom and religion have a number of other equally importamt categories in those clusters.
+```{r}
+# Using kmeans++ initialization
+clust2 = kmeanspp(X, k=7, nstart=25)
+
+Y = data.frame(raw.data)
+Y$cluster = 0
+for (i in 1:7){
+  for (j in which(clust2$cluster == i)){
+    Y[j,"cluster"] = i
+  }
+  
+}
+```
+
+```{r}
+par(mfrow=c(5,2))
+for (i in 1:7) {
+  
+  mask = Y$cluster==i
+  temp = Y[,-length(Y)]
+  value_count = rowSums(t(temp[mask,-1]))
+  df = as.data.frame(value_count)
+  df$index = rownames(df)
+  #print(df)
+
+
+# Draw plot
+  print(ggplot(df ,aes(x=index, y=value_count)) + 
+          geom_bar(stat="identity", width=.5, fill="tomato3") +
+          labs(title="Bar Chart",
+               subtitle="Categories vs Value Counts") + 
+          theme(axis.text.x = element_text(angle=65, vjust=0.6)))
+}
+
+```
+
+
+We conduct hierarchical clustering to see if we can determine the optimum number of clusters based on the proximity matrix. However, hierarchical clustering does not work well her for a range of k-values.
+```{r}
+# Form a pairwise distance matrix using the dist function
+distance_matrix = dist(X, method='euclidean')
+
+
+# Now run hierarchical clustering
+hier_X = hclust(distance_matrix, method='average')
+
+
+
+# Plot the dendrogram
+plot(hier_X, cex=0.8)
+
+# Cut the tree into 5 clusters
+clust3 = cutree(hier_X, k=37)
+summary(factor(clust3))
+```
+
+
+The average distance of the withinss of cluster 1 is around 18% of the average distance of betweens of cluster 1. Hence, based on this data, our clusters seem to be separated in an clear way.
+```{r}
+# Compare versus within-cluster average distances for first two clusters
+clust1$withinss
+clust2$withinss
+sum(clust1$withinss)
+sum(clust2$withinss)
+clust1$betweenss
+clust2$betweenss
+
+mean(clust1$withinss)
+mean(clust2$withinss)
+mean(clust1$betweenss)
+mean(clust2$betweenss)
+```
+
+
+PCR
+We also tried PCR to look at the different kinds of users in our market. We will look at the top 15 variables. In PC space, most of the original observations end up near/close to zero. In the second graph, we can see that categories such as sports fanthom, parenting and religion are the most common one. Only one graph is shown here for context.
+```{r}
+pc2 = prcomp(X, scale=TRUE, rank=2)
+loadings = pc2$rotation
+scores = pc2$x
+```
+
+```{r}
+qplot(scores[,1], scores[,2], color=Y$cluster, xlab='Component 1', ylab='Component 2')
+```
+
+```{r}
+barplot(loadings[,1], las = 2)
+```
+
+The information in this data can be used to bring meaningful insights. For example, if Nutrient H20 is planning to extend its product line or diversify in new products, it can look for categories that are consistent with its target market. For example, if Nutrient H20 plans to target parents, I believe it can incorporate some aspect of food and religion in its value chain so that its more reachable to parents. 
+
+
+Now we will look at correlation between categories which are not distinct such as uncategorized and chatter with distinct categories.
+
+
+```{r}
+cor.chatter <- cor(raw.data$chatter, raw.data[,-1])
+```
+
+```{r}
+cor(raw.data[,-1]$spam, raw.data[,-1])
+```
+
+```{r}
+cor(raw.data[,-1]$uncategorized, raw.data[,-1])
+```
+
+```{r}
+correlation <- round(cor(raw.data[,-1]),2)
+```
+
+```{r}
+library(reshape2)
+melted_cormat <- melt(correlation, na.rm = TRUE)
+# Heatmap
+library(ggplot2)
+ggplot(data = melted_cormat, aes(Var2, Var1, fill = value))+
+ geom_tile(color = "white")+
+ scale_fill_gradient2(low = "blue", high = "red", mid = "white", 
+   midpoint = 0, limit = c(-1,1), space = "Lab", 
+   name="Pearson\nCorrelation") +
+  theme_minimal()+ 
+ theme(axis.text.x = element_text(angle = 45, vjust = 1, 
+    size = 5, hjust = 1))+
+ coord_fixed()
+```
+
+Photo-sharing and shopping are most related to chatter. As expected with spam, the adult category is the most correlated. With uncategorized, dating, cooking, tv-film and beauty are most correlated. 
+
+In the general correlation heatmap, we can see that categories like sports are highly correlated to heath and fitness. Since our company is a large consumer brand company, correlation between categories such as photo-sharing and shopping can be extremely useful to them. For example, closely related tweets in categories such as photo sharing and shopping leads me to believe that such customers would ideally follow bloggers who post pictures of everything on social media. The company can use bloggers as one of their marketing techniques.
+
+
+#Author Attribution 
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+## The tm library and related plugins comprise R's most popular text-mining stack.
+## See http://cran.r-project.org/web/packages/tm/vignettes/tm.pdf
+library(tm) 
+library(magrittr)
+library(slam)
+library(proxy)
+library(tidytext)
+library(textstem)
+## tm has many "reader" functions.  Each one has
+## arguments elem, language, id
+## (see ?readPlain, ?readPDF, ?readXML, etc)
+## This wraps another function around readPlain to read
+## plain text documents in English.
+readerPlain = function(fname){
+				readPlain(elem=list(content=readLines(fname)), 
+							id=fname, language='en') }
+```
+Pre-Processing Train Data :
+
+We take all the files to be used for training and store their names in 'file_list'
+
+```{r}
+## "globbing" = expanding wild cards in filename paths
+file_list = Sys.glob('data/ReutersC50/C50train/*/*.txt')
+raw.data = lapply(file_list, readerPlain) 
+
+# The file names are ugly...
+#file_list
+```
+
+Out train data does not have a column for the response variable (in this case, the name of the author). To extract the author name, we use the file names. 
+
+```{r}
+# Function to split the path name by '/'
+extract_author <- function(x) {
+  strsplit(x, "/")
+}
+
+  
+```
+
+
+```{r}
+#Make a dataframe with the author names of each document
+df = as.data.frame(lapply(extract_author(file_list), function(x) x[length(x) - 1] ))
+author <- t(df)
+rownames(author)<-seq(1,2500)
+#author
+```
+
+We now clean up the file names
+```{r}
+# Clean up the file names
+# This uses the piping operator from magrittr
+mynames = file_list %>%
+	{ strsplit(., '/', fixed=TRUE) } %>%
+	{ lapply(., tail, n=2) } %>%
+	{ lapply(., paste0, collapse = '') } %>%
+	unlist
+	
+# Rename the articles
+#mynames
+names(raw.data) = mynames
+```
+
+
+Cleaning of Data :
+```{r}
+## once you have documents in a vector, you 
+## create a text mining 'corpus' with: 
+documents_raw = Corpus(VectorSource(raw.data))
+
+## Some pre-processing/tokenization steps.
+## tm_map just maps some function to every document in the corpus
+my_documents = documents_raw
+my_documents = tm_map(my_documents, content_transformer(tolower)) # make everything lowercase
+my_documents = tm_map(my_documents, content_transformer(removeNumbers)) # remove numbers
+my_documents = tm_map(my_documents, content_transformer(removePunctuation)) # remove punctuation
+my_documents = tm_map(my_documents, content_transformer(stripWhitespace)) ## remove excess white-space
+my_documents = tm_map(my_documents, content_transformer(removeWords), stopwords("en"))
+my_documents = tm_map(my_documents, content_transformer(stemDocument))
+```
+
+Converting to sparse matrix :
+```{r}
+## create a doc-term-matrix
+DTM_raw = DocumentTermMatrix(my_documents)
+DTM_raw # some basic summary statistics
+
+class(DTM_raw)  # a special kind of sparse matrix format
+
+## You can inspect its entries...
+#inspect(DTM_raw[1:10,1:20])
+
+```
+
+```{r}
+## Finally, drop those terms that only occur in one or two documents
+## This is a common step: the noise of the "long tail" (rare terms)
+##	can be huge, and there is nothing to learn if a term occured once.
+## Below removes those terms that have count 0 in >97% of docs.  
+DTM_raw = removeSparseTerms(DTM_raw, 0.97)
+DTM_raw 
+```
+
+We use TF-IDF values to build our features
+```{r}
+# construct TF IDF weights
+tfidf_raw = weightTfIdf(DTM_raw)
+tfidf_raw
+```
+
+
+```{r}
+train.data <- data.frame(as.matrix(tfidf_raw), stringsAsFactors=FALSE)
+
+#Merge with author names
+train.data <- merge(train.data,author,by =0)
+train.data$V1 <- as.factor(train.data$V1)
+#rev(names(train.data))[1]
+#typeof(train.data['V1'])
+```
+
+Pre-processing on Test data:
+
+We repeat the same procedure as above to get the test data
+
+```{r}
+## "globbing" = expanding wild cards in filename paths
+file_list = Sys.glob('data/ReutersC50/C50test/*/*.txt')
+raw.data = lapply(file_list, readerPlain) 
+
+# The file names are ugly...
+#file_list
+```
+
+
+```{r}
+df = as.data.frame(lapply(extract_author(file_list), function(x) x[length(x) - 1] ))
+author <- t(df)
+rownames(author)<-seq(1,2500)
+#author
+```
+
+
+```{r}
+# Clean up the file names
+# This uses the piping operator from magrittr
+mynames = file_list %>%
+	{ strsplit(., '/', fixed=TRUE) } %>%
+	{ lapply(., tail, n=2) } %>%
+	{ lapply(., paste0, collapse = '') } %>%
+	unlist
+	
+# Rename the articles
+#mynames
+names(raw.data) = mynames
+```
+
+```{r}
+## once you have documents in a vector, you 
+## create a text mining 'corpus' with: 
+documents_raw = Corpus(VectorSource(raw.data))
+
+## Some pre-processing/tokenization steps.
+## tm_map just maps some function to every document in the corpus
+my_documents = documents_raw
+my_documents = tm_map(my_documents, content_transformer(tolower)) # make everything lowercase
+my_documents = tm_map(my_documents, content_transformer(removeNumbers)) # remove numbers
+my_documents = tm_map(my_documents, content_transformer(removePunctuation)) # remove punctuation
+my_documents = tm_map(my_documents, content_transformer(stripWhitespace)) ## remove excess white-space
+my_documents = tm_map(my_documents, content_transformer(removeWords), stopwords("en"))
+my_documents = tm_map(my_documents, content_transformer(stemDocument))
+
+```
+```{r}
+
+## create a doc-term-matrix
+DTM_raw = DocumentTermMatrix(my_documents)
+DTM_raw # some basic summary statistics
+
+class(DTM_raw)  # a special kind of sparse matrix format
+
+## You can inspect its entries...
+#inspect(DTM_raw[1:10,1:20])
+
+```
+
+```{r}
+## Finally, drop those terms that only occur in one or two documents
+## This is a common step: the noise of the "long tail" (rare terms)
+##	can be huge, and there is nothing to learn if a term occured once.
+## Below removes those terms that have count 0 in >95% of docs.  
+DTM_raw = removeSparseTerms(DTM_raw, 0.97)
+DTM_raw 
+```
+
+```{r}
+# construct TF IDF weights
+tfidf_raw = weightTfIdf(DTM_raw)
+tfidf_raw
+```
+
+```{r}
+test.data <- data.frame(as.matrix(tfidf_raw), stringsAsFactors=FALSE)
+#Merge with author names
+test.data <- merge(test.data,author,by =0)
+#rev(names(test.data))[1]
+#typeof(train.data['V1'])
+```
+
+
+We ignore words in the test set that are not present in the train set
+```{r}
+library(tidyverse)
+v1 <- c(names(train.data))
+v2 <- c(names(test.data))
+xc <- intersect(v1,v2)
+#Taking subset of words present in both, the train and test set.
+new_test <- test.data %>% select(xc)
+new_train<-train.data %>% select(xc)
+#rev(names(new_test))[1]
+```
+
+
+Runing Random Forest on Train data.
+```{r}
+library("randomForest")
+set.seed(1234)
+train_rf = randomForest(new_train$V1~., data=new_train, ntree=37, proximity=T)
+#table(predict(train_rf), train.data$V1)
+#train_rf
+plot(train_rf)
+#importance(train_rf)
+```
+Checking model on test data
+
+```{r}
+testPred = predict(train_rf, newdata=new_test, type = 'class')
+#table(testPred, test.data$V1)
+```
+
+```{r}
+CM = table(testPred, new_test$V1)
+accuracy = (sum(diag(CM)))/sum(CM)
+accuracy
+```
+
+We thus get an accuracy of 71.6%
+
+Trying different values of top features to see if performance improves. 
+
+```{r}
+importanceOrder=order(-train_rf$importance)
+topnames=rownames(train_rf$importance)[importanceOrder][2:151]
+topnames = append(topnames,"V1")
+```
+
+
+```{r}
+top_test <- test.data %>% select(topnames)
+top_train<-train.data %>% select(topnames)
+#rev(names(top_test))[1]
+```
+
+
+Runing Random Forest on Train data.
+```{r}
+library("randomForest")
+set.seed(1234)
+toptrain_rf = randomForest(top_train$V1~., data=top_train, ntree=37, proximity=T)
+#table(predict(train_rf), train.data$V1)
+#train_rf
+plot(toptrain_rf)
+#importance(train_rf)
+```
+Checking model on test data
+
+```{r}
+toptestPred = predict(toptrain_rf, newdata=top_test, type = 'class')
+#table(testPred, test.data$V1)
+```
+
+```{r}
+CM = table(toptestPred, top_test$V1)
+accuracy = (sum(diag(CM)))/sum(CM)
+accuracy
+```
+
+The performance does'nt improve that much for various values used to subset features.
+
+
+Summary of the Process Used :
+
+1. We first extract the author name from the file paths in the training set. 
+
+2. Next, we clean the file names and pre-process it in the following order:
+  a) Join all files and convert into one corpus (a structure of a set of texts).
+  This corpus will have rows as each document.
+  b) Tokenize the documents(split each document into separate words) and convert
+  to lower case 
+  c)Remove numbers from the document
+  d)Remove punctuation from the document
+  e)Strip any extra white space (to allow for matches such as "the" and " the")
+  f)Remove stop words (Words like 'as','the','so' do not add much meaning to the sentence without context. Hence we remove them to reduce any noise in the data).
+  g)Stemming (Words such as 'run' and 'running' essentially mean the same. So in
+  stemming, we take each word and use it's root value. In this example, our root
+  value will be 'run')
+
+3) We convert the output from step 3 to a sparse matrix. Rows in a sparse matrix represent data for each document. The columns in the sparse matrix represent each word identified after Step 2. The values for a particular row, column in the matrix is the number of times the word appears in the particular document.
+
+4) We drop terms that may occur only once or twice in the documents. This further removes some noise from the data and reduces number of features.
+
+5) Some texts can be small while some can be large. To compare several texts, the frequency of each word relative to the length of the text is more helpful than the count of each word in the text. We thus use the TF IDF values for this Purpose. So we replace values in the sparse matrix to TF IDF scores.
+
+6) We then merge the author names with output from 5 to get train data.
+
+7) Repeat steps 1 to step 6 using test data.
+
+8) We ignore words present in the test set but not in the train set. 
+
+9) Using an intersection of words between train and test set, We now run Random Forest for classification using (sqrt(p)where p is number of predictors) trees
+to get accuracy of 71.6%.
+
+10) We try using a number of most important features to reduce dimensionality. However, this does not improve the performance.
+
+#Association Rule Mining
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r, echo = FALSE}
+library(tidyverse)
+library(arules)  
+library(arulesViz)
+```
+
+
+```{r, echo = FALSE}
+setwd("C:/Users/Javeria Rangoonwala/Desktop/Predictive Modeling")
+```
+
+
+We read in the groceries data set, separating it by commas and removing duplicates. Each row in this dataset is considered a basket
+```{r}
+groceries <- read.transactions("groceries.txt", format = "basket", sep=",", rm.duplicates=TRUE)
+```
+
+
+A basic summary of the dataset is provided below.
+
+```{r}
+str(groceries)
+summary(groceries)
+```
+
+
+
+We created a matrix of groceries
+
+```{r}
+grocery_matrix <- as(groceries, 'transactions')
+```
+
+
+The Apriori algorithm is based on the understanding that if an itemset has associations, then all of its subsets must also have associations. We choose a relatively restricted criteria, to observe the most common associations. Here we can see that milk and different kinds of vegetables are the most common
+
+```{r}
+groceryrules = apriori(grocery_matrix, parameter=list(support=.002, confidence=.05, maxlen=5))
+
+head(inspect(groceryrules))
+```
+
+
+We increased the support and confidence to account for items that are not purchased. As expected, we can see a wide variety of associations here
+
+```{r}
+groceryrules = apriori(grocery_matrix, parameter=list(support=.005, confidence=.1, maxlen=5))
+```
+
+
+
+Now we make subsets based on a confidence and lift that are not too low nor too high. Then 
+```{r}
+inspect(subset(groceryrules, subset=lift > 5))
+inspect(subset(groceryrules, subset=confidence > 0.6))
+inspect(subset(groceryrules, subset=lift > 10 & confidence > 0.5))
+```
+
+
+We plot support vs confidence for groceryrules. Most of the rules are concentrated below confidence of 0.6 whereas most of the support is less than 0.05, meaning that items in Y appear mostly less than 70% of time. The same can be seen in the graph of lift vs support. Lift is mostly less than 2 for confidence of 70% or less
+
+```{r, echo = FALSE}
+plot(groceryrules)
+```
+
+```{r}
+plot(groceryrules, measure = c("support", "lift"), shading = "confidence")
+```
+
+
+
+"two key" plot to show (order) of item set represented by different colors. Order 1 and Order 2 have comparatively greater support and lower confidence as opposed to other orders.
+
+```{r}
+plot(groceryrules, method='two-key plot')
+```
+
+
+
+These are the subsets that are driven by plot
+
+```{r}
+inspect(subset(groceryrules, support > 0.035))
+inspect(subset(groceryrules, confidence > 0.7))
+```
+
+
+Now we visualise these subsets. The datset is in clusters when the support is high and when the support is low, data set appears to be spread out
+
+```{r}
+sub1 = subset(groceryrules, subset=confidence > 0.01 & support > 0.005)
+summary(sub1)
+plot(sub1, method='graph')
+plot(head(sub1, 100, by='lift'), method='graph')
+
+```
+
+
+
+
