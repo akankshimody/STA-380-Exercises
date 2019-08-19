@@ -251,6 +251,11 @@ geom_bar(stat='identity')
 
 ![](AirportR_files/figure-gfm/unnamed-chunk-4-1.png)<!-- -->
 
+Here, we’ve plotted the top 10 origins with the most cancellations, only
+including incoming flights to Austin. St. Louis Lambert International
+Airport has the highest portion of cancellations of all the origin
+locations.
+
 ``` r
 # plot the percentage of total cancellations per day in descending order
 d2 = incoming %>%
@@ -277,6 +282,9 @@ geom_bar(stat='identity')
 ```
 
 ![](AirportR_files/figure-gfm/unnamed-chunk-5-1.png)<!-- -->
+
+When we plot cancellations by day, we see that the most cancellations
+are on Tuesdays.
 
 ``` r
 #create catgorical varaible for time of day
@@ -322,6 +330,9 @@ ggplot(data = d3) +
 ```
 
 ![](AirportR_files/figure-gfm/unnamed-chunk-7-1.png)<!-- -->
+
+When we plot cancellations by day and time of day, we see that most of
+the cancellations occur on Tuesday afternoons.
 
 ``` r
 canc_carrier = airdata %>%
