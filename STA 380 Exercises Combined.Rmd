@@ -631,7 +631,15 @@ ggplot(data = melted_cormat, aes(Var2, Var1, fill = value))+
 
 Photo-sharing and shopping are most related to chatter. As expected with spam, the adult category is the most correlated. With uncategorized, dating, cooking, tv-film and beauty are most correlated. 
 
-In the general correlation heatmap, we can see that categories like sports are highly correlated to heath and fitness. Since our company is a large consumer brand company, correlation between categories such as photo-sharing and shopping can be extremely useful to them. For example, closely related tweets in categories such as photo sharing and shopping leads me to believe that such customers would ideally follow bloggers who post pictures of everything on social media. The company can use bloggers as one of their marketing techniques.
+In the general correlation heatmap, the highest correlated categories
+which have a correlation approximately equal to 1 are
+(health_nutrition, personal_fitness) and (college_uni, online gaming).
+Since our company is a large consumer brand company, correlation between
+categories such as photo-sharing and shopping can be extremely useful
+to them. For example, closely related tweets in categories such as
+photo sharing and shopping leads me to believe that such customers would
+ideally follow bloggers who post pictures of everything on social media.
+The company can use bloggers as one of their marketing techniques.
 
 
 #Author Attribution 
@@ -978,12 +986,6 @@ library(arules)
 library(arulesViz)
 ```
 
-
-```{r, echo = FALSE}
-setwd("C:/Users/Javeria Rangoonwala/Desktop/Predictive Modeling")
-```
-
-
 We read in the groceries data set, separating it by commas and removing duplicates. Each row in this dataset is considered a basket
 ```{r}
 groceries <- read.transactions("groceries.txt", format = "basket", sep=",", rm.duplicates=TRUE)
@@ -1011,7 +1013,7 @@ The Apriori algorithm is based on the understanding that if an itemset has assoc
 ```{r}
 groceryrules = apriori(grocery_matrix, parameter=list(support=.002, confidence=.05, maxlen=5))
 
-head(inspect(groceryrules))
+#head(inspect(groceryrules))
 ```
 
 
